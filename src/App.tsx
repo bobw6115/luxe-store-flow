@@ -9,6 +9,7 @@ import POSPage from "@/pages/POSPage";
 import InventoryPage from "@/pages/InventoryPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import RefundsPage from "@/pages/RefundsPage";
+import SalesHistoryPage from "@/pages/SalesHistoryPage";
 import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
@@ -31,6 +32,7 @@ function AppRoutes() {
       <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
       <Route path="/analytics" element={<ProtectedRoute adminOnly><AnalyticsPage /></ProtectedRoute>} />
       <Route path="/refunds" element={<ProtectedRoute><RefundsPage /></ProtectedRoute>} />
+      <Route path="/sales-history" element={<ProtectedRoute><SalesHistoryPage /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute adminOnly><SettingsPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>

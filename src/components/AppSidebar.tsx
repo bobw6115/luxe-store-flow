@@ -6,6 +6,7 @@ import {
   Package,
   BarChart3,
   RotateCcw,
+  Receipt,
   Settings,
   LogOut,
 } from 'lucide-react';
@@ -13,6 +14,7 @@ import {
 const navItems = [
   { title: 'POS', path: '/', icon: ScanBarcode, roles: ['admin', 'employee'] },
   { title: 'Inventory', path: '/inventory', icon: Package, roles: ['admin', 'employee'] },
+  { title: 'Sales History', path: '/sales-history', icon: Receipt, roles: ['admin', 'employee'] },
   { title: 'Analytics', path: '/analytics', icon: BarChart3, roles: ['admin'] },
   { title: 'Refunds', path: '/refunds', icon: RotateCcw, roles: ['admin', 'employee'] },
   { title: 'Settings', path: '/settings', icon: Settings, roles: ['admin'] },

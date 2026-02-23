@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CartItem, Product } from '@/types/pos';
-import { getProductByBarcode, deductStock, addSale, getSettings } from '@/lib/store';
+import { getProductByBarcode, getProducts, deductStock, addSale, getSettings } from '@/lib/store';
 import { ScanBarcode, Trash2, Minus, Plus, Receipt, X } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -74,7 +74,18 @@ export default function POSPage() {
     setCart(prev => prev.map((item, i) => {
       if (i !== index) return item;
       const newQty = item.quantity + delta;
-      return newQty <= 0 ? item : { ...item, quantity: newQty };
+      if (newQty <= 0) return item;
+      // Check stock limit
+      const allProducts = getProducts();
+      const prod = allProducts.find(p => p.id === item.productId);
+      if (prod && delta > 0) {
+        const sizeInfo = prod.sizes.find(s => s.size === item.size);
+        if (sizeInfo && newQty > sizeInfo.stock) {
+          toast.error(`Only ${sizeInfo.stock} in stock`);
+          return item;
+        }
+      }
+      return { ...item, quantity: newQty };
     }));
   };
 
