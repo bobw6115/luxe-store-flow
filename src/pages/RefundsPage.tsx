@@ -1,41 +1,62 @@
 import { useState } from 'react';
-import { getSaleByInvoice, restockProduct, addRefund, getSales } from '@/lib/store';
+import { getProductByBarcode, getSales, restockProduct, addRefund } from '@/lib/store';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sale } from '@/types/pos';
-import { Search, RotateCcw } from 'lucide-react';
+import { Sale, SaleItem } from '@/types/pos';
+import { ScanBarcode, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface MatchedItem {
+  sale: Sale;
+  item: SaleItem;
+}
 
 export default function RefundsPage() {
   const { user } = useAuth();
-  const [invoiceSearch, setInvoiceSearch] = useState('');
-  const [sale, setSale] = useState<Sale | null>(null);
+  const [barcodeSearch, setBarcodeSearch] = useState('');
+  const [matchedItems, setMatchedItems] = useState<MatchedItem[]>([]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const found = getSaleByInvoice(invoiceSearch.trim());
-    if (found) {
-      setSale(found);
-    } else {
-      toast.error('Invoice not found');
-      setSale(null);
+    const barcode = barcodeSearch.trim();
+    if (!barcode) return;
+
+    const product = getProductByBarcode(barcode);
+    if (!product) {
+      toast.error('Product not found');
+      setMatchedItems([]);
+      return;
     }
+
+    const sales = getSales();
+    const matches: MatchedItem[] = [];
+    sales.forEach(sale => {
+      sale.items.forEach(item => {
+        if (item.productId === product.id) {
+          matches.push({ sale, item });
+        }
+      });
+    });
+
+    if (matches.length === 0) {
+      toast.error('No sales found for this product');
+    }
+    setMatchedItems(matches.reverse()); // most recent first
   };
 
-  const handleRefund = (item: any) => {
-    if (!sale) return;
-    restockProduct(item.productId, item.size, item.quantity);
+  const handleRefund = (match: MatchedItem) => {
+    restockProduct(match.item.productId, match.item.size, match.item.quantity);
     addRefund({
-      saleId: sale.id,
-      productId: item.productId,
-      productName: item.productName,
-      size: item.size,
-      quantity: item.quantity,
-      refundAmount: item.price * item.quantity,
+      saleId: match.sale.id,
+      productId: match.item.productId,
+      productName: match.item.productName,
+      size: match.item.size,
+      quantity: match.item.quantity,
+      refundAmount: match.item.price * match.item.quantity,
       employeeId: user?.id || '',
     });
-    toast.success(`Refunded ${item.productName} (${item.size})`);
-    setSale(null);
-    setInvoiceSearch('');
+    toast.success(`Refunded ${match.item.productName} (${match.item.size})`);
+    setMatchedItems(prev => prev.filter(m => m !== match));
+    setBarcodeSearch('');
   };
 
   return (
@@ -44,43 +65,47 @@ export default function RefundsPage() {
 
       <form onSubmit={handleSearch} className="mb-6">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <ScanBarcode className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
-            value={invoiceSearch}
-            onChange={e => setInvoiceSearch(e.target.value)}
-            placeholder="Enter invoice number (e.g. INV-00001)"
+            value={barcodeSearch}
+            onChange={e => setBarcodeSearch(e.target.value)}
+            placeholder="Scan or enter product barcode..."
             className="w-full pl-11 pr-4 py-3 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+            autoFocus
           />
         </div>
       </form>
 
-      {sale && (
-        <div className="glass-card rounded-xl p-6 animate-fade-in">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h3 className="font-serif font-bold text-foreground">{sale.invoiceNumber}</h3>
-              <p className="text-sm text-muted-foreground">{new Date(sale.createdAt).toLocaleString()}</p>
-            </div>
-            <span className="text-sm text-muted-foreground">Total: ${sale.totalAmount.toFixed(2)}</span>
-          </div>
-
-          <div className="space-y-2">
-            {sale.items.map((item, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary">
+      {matchedItems.length > 0 && (
+        <div className="space-y-3 animate-fade-in">
+          <p className="text-sm text-muted-foreground mb-2">
+            Found {matchedItems.length} sale(s) for this product
+          </p>
+          {matchedItems.map((match, i) => (
+            <div key={i} className="glass-card rounded-xl p-4 animate-fade-in">
+              <div className="flex justify-between items-start mb-2">
                 <div>
-                  <p className="text-foreground text-sm font-medium">{item.productName}</p>
-                  <p className="text-xs text-muted-foreground">Size: {item.size} · Qty: {item.quantity} · ${item.price.toFixed(2)}</p>
+                  <p className="font-medium text-foreground">{match.item.productName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Size: {match.item.size} · Qty: {match.item.quantity} · ${match.item.price.toFixed(2)} each
+                  </p>
                 </div>
+                <span className="text-xs text-muted-foreground font-mono">{match.sale.invoiceNumber}</span>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <p className="text-xs text-muted-foreground">
+                  {new Date(match.sale.createdAt).toLocaleString()} · {match.sale.employeeName}
+                </p>
                 <button
-                  onClick={() => handleRefund(item)}
+                  onClick={() => handleRefund(match)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/20 text-destructive text-sm hover:bg-destructive/30 transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5" /> Refund
                 </button>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
