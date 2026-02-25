@@ -12,8 +12,8 @@ export default function POSPage() {
   const [sizeModal, setSizeModal] = useState<Product | null>(null);
   const [discount, setDiscount] = useState(0);
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
-  const [cashInput, setCashInput] = useState('');
   const [currency, setCurrency] = useState<'USD' | 'LBP'>('USD');
+  const [showReceiptPrompt, setShowReceiptPrompt] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastSale, setLastSale] = useState<any>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
@@ -98,8 +98,6 @@ export default function POSPage() {
   const total = Math.max(0, subtotal - discountAmount);
   const rate = settings.usdToLbpRate || 89500;
   const displayTotal = currency === 'LBP' ? total * rate : total;
-  const cashGiven = parseFloat(cashInput) || 0;
-  const change = Math.max(0, cashGiven - displayTotal);
 
   const completeSale = () => {
     if (cart.length === 0) return;
@@ -122,10 +120,9 @@ export default function POSPage() {
       employeeName: user?.username || '',
     });
     setLastSale(sale);
-    setShowReceipt(true);
     setCart([]);
     setDiscount(0);
-    setCashInput('');
+    setShowReceiptPrompt(true);
     toast.success('Sale completed!');
   };
 
@@ -233,7 +230,7 @@ export default function POSPage() {
             <input
               type="number"
               value={discount || ''}
-              onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
+              onChange={e => { const v = parseFloat(e.target.value) || 0; setDiscount(Math.max(0, v)); }}
               placeholder="Discount"
               className="flex-1 bg-secondary border border-border rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
             />
@@ -254,23 +251,6 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Cash Input */}
-        <div className="mb-4">
-          <label className="text-sm text-muted-foreground mb-1 block">Cash Received</label>
-          <input
-            type="number"
-            value={cashInput}
-            onChange={e => setCashInput(e.target.value)}
-            placeholder={currency === 'LBP' ? 'Amount in LBP' : 'Amount in USD'}
-            className="w-full bg-secondary border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
-          />
-          {cashGiven > 0 && cashGiven >= displayTotal && (
-            <p className="text-sm text-success mt-1">
-              Change: {currency === 'LBP' ? `${change.toLocaleString()} LBP` : `$${change.toFixed(2)}`}
-            </p>
-          )}
-        </div>
-
         <div className="mt-auto space-y-3">
           <button
             onClick={completeSale}
@@ -280,7 +260,7 @@ export default function POSPage() {
             Complete Sale
           </button>
           <button
-            onClick={() => { setCart([]); setDiscount(0); setCashInput(''); }}
+            onClick={() => { setCart([]); setDiscount(0); }}
             className="w-full py-3 rounded-xl bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors"
           >
             Clear Cart
@@ -315,6 +295,30 @@ export default function POSPage() {
                   <span className="text-xs opacity-70">{s.stock} left</span>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Prompt Modal */}
+      {showReceiptPrompt && lastSale && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="glass-card rounded-2xl p-6 w-96 animate-scale-in text-center">
+            <h3 className="font-serif text-lg font-bold text-foreground mb-2">Sale Complete!</h3>
+            <p className="text-muted-foreground text-sm mb-6">Would the customer like a printable receipt?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowReceiptPrompt(false); }}
+                className="flex-1 py-3 rounded-xl bg-secondary text-secondary-foreground hover:bg-surface-hover transition-colors font-semibold"
+              >
+                No, Skip
+              </button>
+              <button
+                onClick={() => { setShowReceiptPrompt(false); setShowReceipt(true); }}
+                className="flex-1 py-3 rounded-xl gold-gradient text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+              >
+                Yes, Print
+              </button>
             </div>
           </div>
         </div>

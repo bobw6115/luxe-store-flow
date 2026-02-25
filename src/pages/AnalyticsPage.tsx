@@ -9,15 +9,26 @@ export default function AnalyticsPage() {
   const refunds = getRefunds();
 
   const stats = useMemo(() => {
-    const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0);
+    // Calculate refunded quantities per product
+    const refundedQty: Record<string, number> = {};
+    const refundedRevenue: Record<string, number> = {};
+    refunds.forEach((r: any) => {
+      const key = r.productId;
+      refundedQty[key] = (refundedQty[key] || 0) + (r.quantity || 0);
+      refundedRevenue[key] = (refundedRevenue[key] || 0) + (r.refundAmount || 0);
+    });
+
+    const totalRefunds = refunds.reduce((sum: number, r: any) => sum + (r.refundAmount || 0), 0);
+    const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0) - totalRefunds;
     const totalCost = sales.reduce((sum, sale) => {
       return sum + sale.items.reduce((itemSum, item) => {
         const product = products.find(p => p.id === item.productId);
-        return itemSum + (product?.costPrice || 0) * item.quantity;
+        const refundedForItem = refundedQty[item.productId] || 0;
+        const effectiveQty = Math.max(0, item.quantity - refundedForItem);
+        return itemSum + (product?.costPrice || 0) * effectiveQty;
       }, 0);
     }, 0);
-    const totalRefunds = refunds.reduce((sum: number, r: any) => sum + (r.refundAmount || 0), 0);
-    const netProfit = totalRevenue - totalCost - totalRefunds;
+    const netProfit = totalRevenue - totalCost;
 
     // Daily sales
     const dailySales: Record<string, number> = {};
@@ -27,13 +38,19 @@ export default function AnalyticsPage() {
     });
     const chartData = Object.entries(dailySales).map(([date, amount]) => ({ date, amount }));
 
-    // Best sellers
+    // Best sellers (adjusted for refunds)
     const productSales: Record<string, { name: string; count: number }> = {};
     sales.forEach(s => {
       s.items.forEach(item => {
         if (!productSales[item.productId]) productSales[item.productId] = { name: item.productName, count: 0 };
         productSales[item.productId].count += item.quantity;
       });
+    });
+    // Deduct refunded quantities from best seller counts
+    Object.keys(refundedQty).forEach(pid => {
+      if (productSales[pid]) {
+        productSales[pid].count = Math.max(0, productSales[pid].count - refundedQty[pid]);
+      }
     });
     const bestSellers = Object.values(productSales).sort((a, b) => b.count - a.count).slice(0, 5);
 

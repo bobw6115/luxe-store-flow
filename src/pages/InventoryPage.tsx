@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { getProducts, addProduct, deleteProduct, updateProduct } from '@/lib/store';
 import { Product } from '@/types/pos';
 import { Search, Plus, Trash2, Edit2, AlertTriangle, X, Package } from 'lucide-react';
@@ -8,6 +9,8 @@ const CATEGORIES = ['Shirts', 'Pants', 'Blazers', 'Sweaters', 'Accessories', 'Sh
 const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
 export default function InventoryPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [products, setProducts] = useState<Product[]>(getProducts());
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -37,12 +40,14 @@ export default function InventoryPage() {
           <h1 className="font-serif text-2xl font-bold text-foreground">Inventory</h1>
           <p className="text-sm text-muted-foreground">{products.length} products</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl gold-gradient text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
-        >
-          <Plus className="w-4 h-4" /> Add Product
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl gold-gradient text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-4 h-4" /> Add Product
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -77,7 +82,7 @@ export default function InventoryPage() {
               <th className="text-left p-4 text-xs uppercase text-muted-foreground font-semibold">Category</th>
               <th className="text-left p-4 text-xs uppercase text-muted-foreground font-semibold">Price</th>
               <th className="text-left p-4 text-xs uppercase text-muted-foreground font-semibold">Stock</th>
-              <th className="text-right p-4 text-xs uppercase text-muted-foreground font-semibold">Actions</th>
+              {isAdmin && <th className="text-right p-4 text-xs uppercase text-muted-foreground font-semibold">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -114,16 +119,18 @@ export default function InventoryPage() {
                       )}
                     </div>
                   </td>
-                  <td className="p-4 text-right">
-                    <div className="flex gap-1 justify-end">
-                      <button onClick={() => setEditProduct(product)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDelete(product.id)} className="p-2 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+                  {isAdmin && (
+                    <td className="p-4 text-right">
+                      <div className="flex gap-1 justify-end">
+                        <button onClick={() => setEditProduct(product)} className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDelete(product.id)} className="p-2 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}
