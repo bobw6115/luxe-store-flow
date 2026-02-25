@@ -9,13 +9,31 @@ export default function AnalyticsPage() {
   const refunds = getRefunds();
 
   const stats = useMemo(() => {
-    // Calculate refunded quantities per product
+    // Calculate refunded quantities and revenue per product
     const refundedQty: Record<string, number> = {};
     const refundedRevenue: Record<string, number> = {};
+    // Refunds by date for chart adjustment
+    const refundsByDate: Record<string, number> = {};
+    // Refunds by category
+    const refundsByCategory: Record<string, number> = {};
+
     refunds.forEach((r: any) => {
       const key = r.productId;
       refundedQty[key] = (refundedQty[key] || 0) + (r.quantity || 0);
       refundedRevenue[key] = (refundedRevenue[key] || 0) + (r.refundAmount || 0);
+
+      // Find the original sale date to reverse revenue on that date
+      const sale = sales.find(s => s.id === r.saleId);
+      if (sale) {
+        const day = new Date(sale.createdAt).toLocaleDateString();
+        refundsByDate[day] = (refundsByDate[day] || 0) + (r.refundAmount || 0);
+      }
+
+      // Category performance adjustment
+      const product = products.find(p => p.id === r.productId);
+      if (product) {
+        refundsByCategory[product.category] = (refundsByCategory[product.category] || 0) + (r.refundAmount || 0);
+      }
     });
 
     const totalRefunds = refunds.reduce((sum: number, r: any) => sum + (r.refundAmount || 0), 0);
@@ -30,11 +48,17 @@ export default function AnalyticsPage() {
     }, 0);
     const netProfit = totalRevenue - totalCost;
 
-    // Daily sales
+    // Daily sales adjusted for refunds on original dates
     const dailySales: Record<string, number> = {};
     sales.forEach(s => {
       const day = new Date(s.createdAt).toLocaleDateString();
       dailySales[day] = (dailySales[day] || 0) + s.totalAmount;
+    });
+    // Subtract refunds from their original sale dates
+    Object.entries(refundsByDate).forEach(([date, amount]) => {
+      if (dailySales[date] !== undefined) {
+        dailySales[date] = Math.max(0, dailySales[date] - amount);
+      }
     });
     const chartData = Object.entries(dailySales).map(([date, amount]) => ({ date, amount }));
 
@@ -46,7 +70,6 @@ export default function AnalyticsPage() {
         productSales[item.productId].count += item.quantity;
       });
     });
-    // Deduct refunded quantities from best seller counts
     Object.keys(refundedQty).forEach(pid => {
       if (productSales[pid]) {
         productSales[pid].count = Math.max(0, productSales[pid].count - refundedQty[pid]);
@@ -54,13 +77,19 @@ export default function AnalyticsPage() {
     });
     const bestSellers = Object.values(productSales).sort((a, b) => b.count - a.count).slice(0, 5);
 
-    // Category performance
+    // Category performance adjusted for refunds
     const catPerf: Record<string, number> = {};
     sales.forEach(s => {
       s.items.forEach(item => {
         const product = products.find(p => p.id === item.productId);
         if (product) catPerf[product.category] = (catPerf[product.category] || 0) + item.price * item.quantity;
       });
+    });
+    // Subtract refunds from category revenue
+    Object.entries(refundsByCategory).forEach(([cat, amount]) => {
+      if (catPerf[cat] !== undefined) {
+        catPerf[cat] = Math.max(0, catPerf[cat] - amount);
+      }
     });
     const categoryData = Object.entries(catPerf).map(([category, revenue]) => ({ category, revenue }));
 
