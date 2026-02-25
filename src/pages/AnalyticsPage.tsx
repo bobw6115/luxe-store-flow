@@ -41,12 +41,15 @@ export default function AnalyticsPage() {
     const totalCost = sales.reduce((sum, sale) => {
       return sum + sale.items.reduce((itemSum, item) => {
         const product = products.find(p => p.id === item.productId);
-        const refundedForItem = refundedQty[item.productId] || 0;
-        const effectiveQty = Math.max(0, item.quantity - refundedForItem);
-        return itemSum + (product?.costPrice || 0) * effectiveQty;
+        return itemSum + (product?.costPrice || 0) * item.quantity;
       }, 0);
     }, 0);
-    const netProfit = totalRevenue - totalCost;
+    // Subtract cost of refunded items
+    const refundedCost = refunds.reduce((sum: number, r: any) => {
+      const product = products.find(p => p.id === r.productId);
+      return sum + (product?.costPrice || 0) * (r.quantity || 0);
+    }, 0);
+    const netProfit = totalRevenue - (totalCost - refundedCost);
 
     // Daily sales adjusted for refunds on original dates
     const dailySales: Record<string, number> = {};
@@ -60,7 +63,7 @@ export default function AnalyticsPage() {
         dailySales[date] = Math.max(0, dailySales[date] - amount);
       }
     });
-    const chartData = Object.entries(dailySales).map(([date, amount]) => ({ date, amount }));
+    const chartData = Object.entries(dailySales).map(([date, amount]) => ({ date, amount: parseFloat(amount.toFixed(2)) }));
 
     // Best sellers (adjusted for refunds)
     const productSales: Record<string, { name: string; count: number }> = {};
