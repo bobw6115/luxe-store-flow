@@ -108,7 +108,8 @@ const defaultProducts: Product[] = [
 
 // Initialize
 export function initializeStore(): void {
-  if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
+  const existingUsers = getItem<User[]>(STORAGE_KEYS.USERS, []);
+  if (!Array.isArray(existingUsers) || existingUsers.length === 0) {
     setItem(STORAGE_KEYS.USERS, defaultUsers);
   }
   if (!localStorage.getItem(STORAGE_KEYS.PRODUCTS)) {
@@ -125,16 +126,44 @@ export function initializeStore(): void {
   }
 }
 
+function normalizeUsername(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 // Users
 export function getUsers(): User[] { return getItem(STORAGE_KEYS.USERS, defaultUsers); }
 export function authenticateUser(username: string, password: string): User | null {
-  const users = getUsers();
-  const hash = simpleHash(password);
-  return users.find(u => u.username === username && u.passwordHash === hash) || null;
+  const users = getUsers() as Array<User & { password?: string }>;
+
+  const rawUsername = username ?? '';
+  const rawPassword = password ?? '';
+  const trimmedPassword = rawPassword.trim();
+
+  const normalizedInputUsername = normalizeUsername(rawUsername);
+  const passwordCandidates = new Set([
+    simpleHash(rawPassword),
+    simpleHash(trimmedPassword),
+    rawPassword,
+    trimmedPassword,
+  ]);
+
+  return users.find((u) => {
+    const normalizedStoredUsername = normalizeUsername(u.username ?? '');
+    if (normalizedStoredUsername !== normalizedInputUsername) return false;
+
+    const legacyPlainPassword = typeof u.password === 'string' ? u.password : '';
+    return passwordCandidates.has(u.passwordHash) || passwordCandidates.has(legacyPlainPassword);
+  }) || null;
 }
 export function addUser(username: string, password: string, role: 'admin' | 'employee'): User {
   const users = getUsers();
-  const newUser: User = { id: generateId(), username, passwordHash: simpleHash(password), role, createdAt: new Date().toISOString() };
+  const newUser: User = {
+    id: generateId(),
+    username: username.trim(),
+    passwordHash: simpleHash(password.trim()),
+    role,
+    createdAt: new Date().toISOString(),
+  };
   users.push(newUser);
   setItem(STORAGE_KEYS.USERS, users);
   return newUser;
@@ -144,7 +173,7 @@ export function deleteUser(id: string): void {
   setItem(STORAGE_KEYS.USERS, users);
 }
 export function resetUserPassword(id: string, newPassword: string): void {
-  const users = getUsers().map(u => u.id === id ? { ...u, passwordHash: simpleHash(newPassword) } : u);
+  const users = getUsers().map(u => u.id === id ? { ...u, passwordHash: simpleHash(newPassword.trim()) } : u);
   setItem(STORAGE_KEYS.USERS, users);
 }
 
