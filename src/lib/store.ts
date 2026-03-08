@@ -139,20 +139,24 @@ export function authenticateUser(username: string, password: string): User | nul
   const rawPassword = password ?? '';
   const trimmedPassword = rawPassword.trim();
 
+  if (!trimmedPassword) return null;
+
   const normalizedInputUsername = normalizeUsername(rawUsername);
-  const passwordCandidates = new Set([
-    simpleHash(rawPassword),
-    simpleHash(trimmedPassword),
-    rawPassword,
-    trimmedPassword,
-  ]);
+  const hashedRaw = simpleHash(rawPassword);
+  const hashedTrimmed = simpleHash(trimmedPassword);
 
   return users.find((u) => {
     const normalizedStoredUsername = normalizeUsername(u.username ?? '');
     if (normalizedStoredUsername !== normalizedInputUsername) return false;
 
+    // Check hashed password against stored hash
+    if (u.passwordHash === hashedRaw || u.passwordHash === hashedTrimmed) return true;
+
+    // Legacy: check if user was stored with plain-text password field
     const legacyPlainPassword = typeof u.password === 'string' ? u.password : '';
-    return passwordCandidates.has(u.passwordHash) || passwordCandidates.has(legacyPlainPassword);
+    if (legacyPlainPassword && (legacyPlainPassword === rawPassword || legacyPlainPassword === trimmedPassword)) return true;
+
+    return false;
   }) || null;
 }
 export function addUser(username: string, password: string, role: 'admin' | 'employee'): User {
